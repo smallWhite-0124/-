@@ -1,0 +1,89 @@
+import requests
+
+# ==================== 配置区 ====================
+API_KEY = "此处填写你的API Key"
+API_URL = "@@@@@@@"
+MODEL_NAME = "@@@@@@@"
+# ==================================================================
+
+headers = {
+    "Authorization": f"Bearer {API_KEY}",
+    "Content-Type": "application/json"
+}
+
+def llm_call(prompt):
+    """调用大模型接口"""
+    payload = {
+        "model": MODEL_NAME,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 1.0  # 提高随机性，避免重复
+    }
+    try:
+        response = requests.post(API_URL, json=payload, headers=headers, timeout=20)
+        response.raise_for_status()
+        return response.json()["choices"][0]["message"]["content"].strip()
+    except Exception as e:
+        return f"API请求失败：{str(e)}"
+
+def generate_soup():
+    """生成海龟汤汤面"""
+    prompt = "随机生成一个不重复的简短海龟汤汤面，只输出汤面，不要任何多余内容。"
+    return llm_call(prompt)
+
+def judge_question(soup, history, question):
+    """严格判断玩家问题，只返回 是 / 否 / 无关紧要"""
+    history_text = "\n".join(history) if history else "无"
+    prompt = f"""
+你是一个严格的海龟汤裁判，只能回答：是、否、无关紧要 三者之一。
+不允许加任何解释、标点、符号、语气词，只允许返回这三个词中的一个。
+
+汤面：{soup}
+历史问答：{history_text}
+玩家问题：{question}
+请回答：
+"""
+    reply = llm_call(prompt)
+
+    # 强制清洗输出，防止AI乱说话
+    if "是" in reply:
+        return "是"
+    elif "否" in reply:
+        return "否"
+    else:
+        return "无关紧要"
+
+def get_answer(soup):
+    """获取汤底（答案）"""
+    prompt = f"请给出这个海龟汤的完整汤底：{soup}"
+    return llm_call(prompt)
+
+def main():
+    print("===== 海龟汤 命令行小游戏 =====")
+    print("游戏规则：通过提问推理真相，我只回答 是 / 否 / 无关紧要")
+    print("指令：输入【答案】查看汤底，输入【退出】结束游戏\n")
+
+    print("正在生成汤面...")
+    soup_content = generate_soup()
+    print(f"【汤面】{soup_content}\n")
+
+    history_records = []
+
+    while True:
+        user_input = input("请输入你的问题：").strip()
+
+        if user_input == "退出":
+            print("游戏结束！")
+            break
+        if user_input == "答案":
+            print("\n【汤底】" + get_answer(soup_content))
+            break
+        if not user_input:
+            print("请输入有效问题！\n")
+            continue
+
+        reply = judge_question(soup_content, history_records, user_input)
+        print(f"回答：{reply}\n")
+        history_records.append(f"Q：{user_input} → A：{reply}")
+
+if __name__ == "__main__":
+    main()
